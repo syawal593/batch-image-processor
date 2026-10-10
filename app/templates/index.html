@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch Image Processor - Live Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <div class="max-w-3xl mx-auto w-full px-4 py-12">
+        <div class="text-center mb-8">
+            <span class="bg-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">Sistem Konkuren & Paralel</span>
+            <h1 class="text-3xl font-bold mt-3 text-slate-900">Batch Image Processor</h1>
+            <p class="text-slate-500 text-sm mt-1">Pantau langsung mekanisme Async, Multiprocessing, & Multithreading secara *real-time*.</p>
+        </div>
+
+        <div class="bg-white shadow-xl shadow-slate-200/60 rounded-3xl p-8 border border-slate-100">
+            <form id="uploadForm" class="space-y-6">
+                <div id="dropzone" class="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-indigo-500 hover:bg-indigo-50/30 transition-all cursor-pointer group" onclick="document.getElementById('files').click()">
+                    <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    </div>
+                    <p id="fileLabel" class="text-slate-700 font-medium text-sm">Seret file gambar ke sini atau <span class="text-indigo-600 font-semibold">pilih file</span></p>
+                    <p class="text-slate-400 text-xs mt-1">Mendukung format PNG, JPG, JPEG, WEBP</p>
+                    <input type="file" id="files" name="files" multiple accept="image/*" class="hidden" onchange="handleFileSelect()">
+                </div>
+
+                <button type="submit" id="submitBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3.5 rounded-xl transition shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer">
+                    <span>Mulai Proses Gambar</span>
+                </button>
+            </form>
+
+            <!-- Live Progress Steps Container -->
+            <div id="progressContainer" class="hidden mt-8 space-y-4">
+                <h3 class="text-sm font-semibold text-slate-700">Status Eksekusi Sistem:</h3>
+                <div class="space-y-2 text-sm bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <div id="step1" class="flex items-center gap-3 text-slate-400">
+                        <span class="w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-xs font-bold">1</span>
+                        <span>Tahap 1: Non-Blocking Upload File</span>
+                    </div>
+                    <div id="step2" class="flex items-center gap-3 text-slate-400">
+                        <span class="w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-xs font-bold">2</span>
+                        <span>Tahap 2: Multiprocessing CPU (Resize & Kompresi)</span>
+                    </div>
+                    <div id="step3" class="flex items-center gap-3 text-slate-400">
+                        <span class="w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-xs font-bold">3</span>
+                        <span>Tahap 3: Multithreading I/O (Pembuatan Arsip ZIP)</span>
+                    </div>
+                </div>
+                <p id="liveStatusText" class="text-xs text-indigo-600 font-medium animate-pulse text-center">Menyiapkan koneksi...</p>
+            </div>
+
+            <!-- Result State -->
+            <div id="resultState" class="hidden mt-8 p-6 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-3">
+                <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-emerald-900 font-semibold">Semua Proses Selesai!</h3>
+                    <p class="text-emerald-700 text-xs mt-0.5">Sistem telah sukses mengeksekusi Async, Multiprocessing, dan Multithreading.</p>
+                </div>
+                <a id="downloadBtn" href="#" class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition shadow-md">
+                    Unduh Arsip (.ZIP)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function handleFileSelect() {
+            const input = document.getElementById('files');
+            const label = document.getElementById('fileLabel');
+            if (input.files.length > 0) {
+                label.innerHTML = `Terpilih <span class="text-indigo-600 font-bold">${input.files.length} file gambar</span>`;
+            }
+        }
+
+        document.getElementById('uploadForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const inputFiles = document.getElementById('files').files;
+            if (inputFiles.length === 0) {
+                alert('Silakan pilih minimal 1 file gambar!');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < inputFiles.length; i++) {
+                formData.append('files', inputFiles[i]);
+            }
+
+            // Reset UI
+            document.getElementById('uploadForm').classList.add('opacity-50', 'pointer-events-none');
+            document.getElementById('progressContainer').classList.remove('hidden');
+            document.getElementById('resultState').classList.add('hidden');
+
+            try {
+                const response = await fetch('/process-stream', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop(); // sisa buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.replace('data: ', ''));
+                            document.getElementById('liveStatusText').textContent = data.text;
+
+                            if (data.step >= 1) updateStepUI(1, data.step >= 2);
+                            if (data.step >= 2) updateStepUI(2, data.step >= 3);
+                            if (data.step >= 3) updateStepUI(3, data.step >= 4);
+
+                            if (data.step === 4) {
+                                document.getElementById('progressContainer').classList.add('hidden');
+                                const downloadBtn = document.getElementById('downloadBtn');
+                                downloadBtn.href = `/download/${data.zip_filename}`;
+                                document.getElementById('resultState').classList.remove('hidden');
+                                document.getElementById('uploadForm').classList.remove('opacity-50', 'pointer-events-none');
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                alert('Terjadi kesalahan koneksi.');
+                document.getElementById('uploadForm').classList.remove('opacity-50', 'pointer-events-none');
+            }
+        };
+
+        function updateStepUI(stepNum, isCompleted) {
+            const stepEl = document.getElementById(`step${stepNum}`);
+            const circle = stepEl.querySelector('span');
+            if (isCompleted) {
+                stepEl.className = "flex items-center gap-3 text-emerald-600 font-medium";
+                circle.className = "w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold";
+                circle.innerHTML = "✓";
+            } else {
+                stepEl.className = "flex items-center gap-3 text-indigo-600 font-medium animate-pulse";
+                circle.className = "w-5 h-5 rounded-full border-2 border-indigo-600 flex items-center justify-center text-xs font-bold";
+            }
+        }
+    </script>
+</body>
+</html>
